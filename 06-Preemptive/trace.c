@@ -41,13 +41,20 @@ void trace_context_switch(int end)
 	 * systick_handler and in the end of the activate function.
 	 */
 	if (!get_current())
-		return ;
+		return;
+
+	/*
+	 * Do nothing if the previous tick is zero. This only happens during
+	 * the system boots up.
+	 */
+	if (end && !prev_tick)
+		return;
 
 	if (!end) {
 		prev_task = get_current_task();
 		prev_tick = get_current();
 		tick_count++;
-		return ;
+		return;
 	}
 
 	len = snprintf(buf, 128, "switch %d %d %d %d %d %d\n",
