@@ -1,0 +1,7 @@
+file os.elf
+target remote :3333
+
+b systick_handler
+b context_switch.S:48
+b syscall.S:4
+c
