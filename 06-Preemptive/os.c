@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include "reg.h"
 #include "asm.h"
+#include "trace.h"
+#include "string.h"
 
 /* Size of our user task stacks in words */
 #define STACK_SIZE	256
@@ -14,6 +16,14 @@
  * set when that data is transferred to the TDR
  */
 #define USART_FLAG_TXE	((uint16_t) 0x0080)
+
+/* 72MHz */
+#define CPU_CLOCK_HZ 72000000
+
+/* 100 ms per tick. */
+#define TICK_RATE_HZ 10
+
+static size_t current_task;
 
 void usart_init(void)
 {
@@ -85,6 +95,7 @@ void task1_func(void)
 {
 	print_str("task1: Created!\n");
 	print_str("task1: Now, return to kernel mode\n");
+
 	syscall();
 	while (1) {
 		print_str("task1: Running...\n");
@@ -103,27 +114,38 @@ void task2_func(void)
 	}
 }
 
+int get_current_task(void)
+{
+	return current_task;
+}
+
 int main(void)
 {
 	unsigned int user_stacks[TASK_LIMIT][STACK_SIZE];
 	unsigned int *usertasks[TASK_LIMIT];
 	size_t task_count = 0;
-	size_t current_task;
+
+	if (trace_init() == -1) {
+		print_str("OS: trace subsystem init failed\n");
+		return -1;
+	}
 
 	usart_init();
 
 	print_str("OS: Starting...\n");
 	print_str("OS: First create task 1\n");
 	usertasks[0] = create_task(user_stacks[0], &task1_func);
+	trace_task_info(task_count);
 	task_count += 1;
 	print_str("OS: Back to OS, create task 2\n");
 	usertasks[1] = create_task(user_stacks[1], &task2_func);
+	trace_task_info(task_count);
 	task_count += 1;
 
 	print_str("\nOS: Start round-robin scheduler!\n");
 
 	/* SysTick configuration */
-	*SYSTICK_LOAD = 7200000;
+	*SYSTICK_LOAD = (CPU_CLOCK_HZ / TICK_RATE_HZ) - 1UL;
 	*SYSTICK_VAL = 0;
 	*SYSTICK_CTRL = 0x07;
 	current_task = 0;
